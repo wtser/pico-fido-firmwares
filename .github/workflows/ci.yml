@@ -1,0 +1,32 @@
+name: pico-fido matrix build
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+      - name: Matrix compile
+        run: nix build
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: all-pico-fido-firmwares
+          path: result/share/pico-fido/
+          compression-level: 9
+          if-no-files-found: error
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        if: github.ref_type == 'tag'
+        with:
+          files: result/share/pico-fido/*
