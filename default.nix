@@ -2,16 +2,13 @@
   lib,
   stdenvNoCC,
   fetchFromGitHub,
-
   cmake,
   gcc-arm-embedded,
   picotool,
   python3,
-
   pico-sdk,
 
   # Options
-  # https://github.com/polhenarejos/pico-fido#build-for-raspberry-pico
   picoBoard ? "pico",
   vidpid ? null,
   usbVID ? null,
@@ -20,16 +17,12 @@
   secureBootPKey ? null,
   extraCmakeFlags ? null,
 }:
+
 assert lib.assertMsg (
   !(vidpid != null && (usbVID != null || usbPID != null))
 ) "pico-fido: Arguments 'vidpid' and 'usbVID/usbPID' could not be set at the same time.";
-assert lib.assertMsg ((secureBootPKey != null) -> (lib.isPath secureBootPKey))
-  "pico-fido: Argument 'secureBootPKey' must be a valid file path, but got: '${toString secureBootPKey}'.";
-assert lib.assertMsg (
-  (extraCmakeFlags != null) -> (lib.isList extraCmakeFlags)
-) "pico-fido: Argument 'extraCmakeFlags' must be a list, but got: '${toString extraCmakeFlags}'.";
-stdenvNoCC.mkDerivation (finalAttrs: {
 
+stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "pico-fido";
   version = "7.2";
 
@@ -39,6 +32,14 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     rev = "v${finalAttrs.version}";
     hash = "sha256-PKuIFfyIULlq9xSjcYtMTVm+r+5JjIJTtscxvlCxKdE=";
     fetchSubmodules = true;
+  };
+
+  # --- FIX: Manually fetch the fork containing 'eddsa.c' ---
+  mbedtlsFork = fetchFromGitHub {
+    owner = "polhenarejos";
+    repo = "mbedtls";
+    rev = "mbedtls-3.6-eddsa";
+    hash = "sha256-a2edwKskmOKMy34xsD29OW/TlfHCn5PtUKDliDGUXi8=";
   };
 
   strictDeps = true;
@@ -51,6 +52,22 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   ];
 
   PICO_SDK_PATH = "${pico-sdk.override { withSubmodules = true; }}/lib/pico-sdk/";
+
+  postPatch = ''
+    echo "--- Patching: Neutralizing Git Commands (Global) ---"
+
+    find . -name "*.cmake" -o -name "CMakeLists.txt" -print0 | xargs -0 sed -i 's/git submodule update/echo "Nix: Skipped git submodule update"/g'
+    find . -name "*.cmake" -o -name "CMakeLists.txt" -print0 | xargs -0 sed -i 's/git checkout/echo "Nix: Skipped git checkout"/g'
+
+    ${lib.optionalString eddsa ''
+      echo "--- Patching: Injecting EdDSA mbedtls fork (eddsa=true) ---"
+      rm -rf pico-keys-sdk/mbedtls
+      cp -r --no-preserve=mode ${finalAttrs.mbedtlsFork} pico-keys-sdk/mbedtls
+      chmod -R u+w pico-keys-sdk/mbedtls
+    ''}
+
+    echo "--- Patching Complete ---"
+  '';
 
   cmakeFlags = [
     "-DCMAKE_C_COMPILER=${lib.getExe' gcc-arm-embedded "arm-none-eabi-gcc"}"
@@ -69,13 +86,10 @@ stdenvNoCC.mkDerivation (finalAttrs: {
 
   installPhase = ''
     runHook preInstall
-
     mkdir -p $out/share/pico-fido
-
     install pico_fido.uf2 $out/share/pico-fido/pico-fido-${picoBoard}-${
       if (vidpid != null) then vidpid else "none"
     }${if eddsa then "-eddsa" else ""}.uf2
-
     runHook postInstall
   '';
 
