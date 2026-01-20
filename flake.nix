@@ -6,19 +6,31 @@
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs =
+    {
+      self,
+      nixpkgs,
+      flake-utils,
+    }:
+    flake-utils.lib.eachDefaultSystem (
+      system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
         lib = nixpkgs.lib;
-        allSupportedBoards = lib.filter
-          (s: s != "" && !(lib.hasPrefix "#" s))
-          (lib.splitString "\n" (lib.trim (builtins.readFile ./allSupportedBoards.txt)));
+        allSupportedBoards = lib.filter (s: s != "" && !(lib.hasPrefix "#" s)) (
+          lib.splitString "\n" (lib.trim (builtins.readFile ./allSupportedBoards.txt))
+        );
         argMatrix = lib.cartesianProduct {
           picoBoard = allSupportedBoards;
           vidpid = [ null ];
+          eddsa = [
+            false
+            true
+          ];
         };
-        allFirmwareDrvs = map (args: pkgs.callPackage ./default.nix { inherit (args) picoBoard vidpid; }) argMatrix;      
+        allFirmwareDrvs = map (
+          args: pkgs.callPackage ./default.nix { inherit (args) picoBoard vidpid eddsa; }
+        ) argMatrix;
       in
       {
         packages.default = pkgs.symlinkJoin {

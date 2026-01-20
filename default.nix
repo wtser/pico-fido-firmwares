@@ -16,12 +16,18 @@
   vidpid ? null,
   usbVID ? null,
   usbPID ? null,
+  eddsa ? false,
   secureBootPKey ? null,
   extraCmakeFlags ? null,
 }:
-assert lib.assertMsg (!(vidpid != null && (usbVID != null || usbPID != null))) "pico-fido: Arguments 'vidpid' and 'usbVID/usbPID' could not be set at the same time.";
-assert lib.assertMsg ((secureBootPKey != null) -> (lib.isPath secureBootPKey)) "pico-fido: Argument 'secureBootPKey' must be a valid file path, but got: '${toString secureBootPKey}'.";
-assert lib.assertMsg ((extraCmakeFlags != null) -> (lib.isList extraCmakeFlags)) "pico-fido: Argument 'extraCmakeFlags' must be a list, but got: '${toString extraCmakeFlags}'.";
+assert lib.assertMsg (
+  !(vidpid != null && (usbVID != null || usbPID != null))
+) "pico-fido: Arguments 'vidpid' and 'usbVID/usbPID' could not be set at the same time.";
+assert lib.assertMsg ((secureBootPKey != null) -> (lib.isPath secureBootPKey))
+  "pico-fido: Argument 'secureBootPKey' must be a valid file path, but got: '${toString secureBootPKey}'.";
+assert lib.assertMsg (
+  (extraCmakeFlags != null) -> (lib.isList extraCmakeFlags)
+) "pico-fido: Argument 'extraCmakeFlags' must be a list, but got: '${toString extraCmakeFlags}'.";
 stdenvNoCC.mkDerivation (finalAttrs: {
 
   pname = "pico-fido";
@@ -44,15 +50,20 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     python3
   ];
 
-  PICO_SDK_PATH="${pico-sdk.override { withSubmodules = true; }}/lib/pico-sdk/";
+  PICO_SDK_PATH = "${pico-sdk.override { withSubmodules = true; }}/lib/pico-sdk/";
 
   cmakeFlags = [
     "-DCMAKE_C_COMPILER=${lib.getExe' gcc-arm-embedded "arm-none-eabi-gcc"}"
     "-DCMAKE_CXX_COMPILER=${lib.getExe' gcc-arm-embedded "arm-none-eabi-g++"}"
+    "-DCMAKE_BUILD_TYPE=Release"
   ]
   ++ lib.optionals (picoBoard != null) [ "-DPICO_BOARD=${picoBoard}" ]
   ++ lib.optionals (vidpid != null) [ "-DVIDPID=${vidpid}" ]
-  ++ lib.optionals (usbVID != null && usbPID != null) [ "-DUSB_VID=${usbVID}" "-DUSB_PID=${usbPID}" ]
+  ++ lib.optionals (usbVID != null && usbPID != null) [
+    "-DUSB_VID=${usbVID}"
+    "-DUSB_PID=${usbPID}"
+  ]
+  ++ lib.optionals eddsa [ "-DENABLE_EDDSA=ON" ]
   ++ lib.optionals (secureBootPKey != null) [ "-DSECURE_BOOT_PKEY=${secureBootPKey}" ]
   ++ lib.optionals (extraCmakeFlags != null) extraCmakeFlags;
 
@@ -60,7 +71,10 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     runHook preInstall
 
     mkdir -p $out/share/pico-fido
-    install pico_fido.uf2 $out/share/pico-fido/pico-fido-${picoBoard}-${if (vidpid != null) then vidpid else "none"}.uf2
+
+    install pico_fido.uf2 $out/share/pico-fido/pico-fido-${picoBoard}-${
+      if (vidpid != null) then vidpid else "none"
+    }${if eddsa then "-eddsa" else ""}.uf2
 
     runHook postInstall
   '';

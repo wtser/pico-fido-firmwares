@@ -4,29 +4,59 @@ on:
   push:
     branches:
       - main
-    tags:
-      - '*'
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
       - name: Install Nix
         uses: cachix/install-nix-action@v31
+
       - name: Matrix compile
         run: nix build
+
+      - name: Calculate Next Version
+        id: tag_calc
+        run: |
+          BASE_VER="7.2"
+          PREFIX="picofido-$BASE_VER-"
+
+          LAST_BUILD=$(git tag --list "${PREFIX}*" | sed "s/^${PREFIX}//" | sort -n | tail -1)
+
+          if [ -z "$LAST_BUILD" ]; then
+            NEW_BUILD=1
+          else
+            NEW_BUILD=$((LAST_BUILD + 1))
+          fi
+
+          NEW_TAG="${PREFIX}${NEW_BUILD}"
+          echo "Calculated new tag: $NEW_TAG"
+
+          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v6
         with:
           name: all-pico-fido-firmwares
           path: result/share/pico-fido/
           compression-level: 9
-          if-no-files-found: error
-      - name: Release
+
+      - name: Create Release
         uses: softprops/action-gh-release@v2
-        if: github.ref_type == 'tag'
         with:
+          tag_name: ${{ steps.tag_calc.outputs.new_tag }}
+          name: Release ${{ steps.tag_calc.outputs.new_tag }}
           files: result/share/pico-fido/*
+          make_latest: true
