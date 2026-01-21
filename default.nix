@@ -34,7 +34,6 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     fetchSubmodules = true;
   };
 
-  # --- FIX: Manually fetch the fork containing 'eddsa.c' ---
   mbedtlsFork = fetchFromGitHub {
     owner = "polhenarejos";
     repo = "mbedtls";
@@ -55,9 +54,14 @@ stdenvNoCC.mkDerivation (finalAttrs: {
 
   postPatch = ''
     echo "--- Patching: Neutralizing Git Commands (Global) ---"
-
     find . -name "*.cmake" -o -name "CMakeLists.txt" -print0 | xargs -0 sed -i 's/git submodule update/echo "Nix: Skipped git submodule update"/g'
     find . -name "*.cmake" -o -name "CMakeLists.txt" -print0 | xargs -0 sed -i 's/git checkout/echo "Nix: Skipped git checkout"/g'
+
+    echo "--- Patching: Applying Libre Keys Branding ---"
+    # 1. Change Manufacturer Name
+    sed -i 's/"Pol Henarejos"/"Libre Keys"/g' pico-keys-sdk/src/usb/usb_descriptors.c
+    # 2. Change URL
+    sed -i 's|"www.picokeys.com"|"www.github.com/librekeys/picoforge"|g' pico-keys-sdk/src/usb/usb_descriptors.c
 
     ${lib.optionalString eddsa ''
       echo "--- Patching: Injecting EdDSA mbedtls fork (eddsa=true) ---"
