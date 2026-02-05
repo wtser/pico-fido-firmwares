@@ -24,7 +24,7 @@ assert lib.assertMsg (
 
 stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "pico-fido";
-  version = "7.2";
+  version = "7.4";
 
   src = fetchFromGitHub {
     owner = "polhenarejos";
