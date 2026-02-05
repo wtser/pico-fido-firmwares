@@ -30,7 +30,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     owner = "polhenarejos";
     repo = "pico-fido";
     rev = "v${finalAttrs.version}";
-    hash = "sha256-PKuIFfyIULlq9xSjcYtMTVm+r+5JjIJTtscxvlCxKdE=";
+    hash = "sha256-/IhKw+9NsRoRlm9Qcme+NqsdRN3myusn3ImSk8oAA5U=";
     fetchSubmodules = true;
   };
 
