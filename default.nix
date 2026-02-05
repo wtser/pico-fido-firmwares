@@ -72,8 +72,12 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   '';
 
   cmakeFlags = [
-    "-DCMAKE_C_COMPILER=${lib.getExe' gcc-arm-embedded "arm-none-eabi-gcc"}"
+"-DCMAKE_C_COMPILER=${lib.getExe' gcc-arm-embedded "arm-none-eabi-gcc"}"
     "-DCMAKE_CXX_COMPILER=${lib.getExe' gcc-arm-embedded "arm-none-eabi-g++"}"
+    # 新增下面这两行，确保链接过程能找到工具
+    "-DCMAKE_AR=${lib.getExe' gcc-arm-embedded "arm-none-eabi-ar"}"
+    "-DCMAKE_RANLIB=${lib.getExe' gcc-arm-embedded "arm-none-eabi-ranlib"}"
+    
     "-DCMAKE_BUILD_TYPE=Release"
   ]
   ++ lib.optionals (picoBoard != null) [ "-DPICO_BOARD=${picoBoard}" ]
